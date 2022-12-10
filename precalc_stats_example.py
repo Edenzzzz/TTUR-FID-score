@@ -25,7 +25,9 @@ data_path = '/Users/eden/Downloads/book dataset' # set path to training set imag
 output_path = os.path.join(data_path,'fid_stats.npz') # path for where to store the statistics
 # path to store compressed training dataset
 img_size=512
-compress_path=None
+dtype=np.float32
+#default path
+compress_path=os.path.join(data_path,'test_set_with_missing_images.dat')
 
 
 inception_path = None
@@ -34,15 +36,20 @@ inception_path = fid.check_or_download_inception(inception_path) # download ince
 print("ok")
 
 
-def compress_image(set="df_train.csv"):
-    print("load images..", flush=True)
+def compress_image(set="df_train.csv",size=1000):
+    
     df=pd.read_csv(os.path.join(data_path,set))
-    #preprocess every label in df_train into image path2
+    assert len(df)>=size,"requested size is larger than size of the dataset "
+    df=df.iloc[:size]
+    print(f"load first {len(df)} images only", flush=True)
+
+    
     global compress_path
     if "train" in set:
         compress_path=os.path.join(data_path,'training_set_with_missing_images.dat')
     else:
         compress_path=os.path.join(data_path,'test_set_with_missing_images.dat')
+    #change every label in df_train into image path
     concat_path=lambda x:os.path.join(data_path+'/images/images',str(x)+'.jpg')
     df=df[df.columns[0]].apply(concat_path)
 
@@ -53,7 +60,7 @@ def compress_image(set="df_train.csv"):
     #initialize images 
     if os.path.isfile(compress_path):
         try:
-            images=np.fromfile(compress_path,dtype=np.float32).reshape(-1,img_size,img_size,3)
+            images=np.fromfile(compress_path,dtype=dtype).reshape(-1,img_size,img_size,3)
         except:
             print('Error! Pre-compressed data shape doesn\'t match currently specified image size. Please delete the pre-compressed file. ')
             exit()
@@ -94,16 +101,16 @@ def compress_image(set="df_train.csv"):
                 failed_list+=[image_list[i]]
                 failed+=1
 
-    images = np.array(np.fromfile(compress_path).reshape(-1,img_size,img_size,3))
-    print("%d images compressed" % len(images))
+    # images = np.array(np.fromfile(compress_path).reshape(-1,img_size,img_size,3))
+    # print("%d images compressed" % len(images))
 
 def calc_stats():
     try:
-        images = np.array(np.fromfile(compress_path).reshape(-1,img_size,img_size,3))
+        images = np.array(np.fromfile(compress_path,dtype=dtype).reshape(-1,img_size,img_size,3))
         print("%d images found and loaded"%len(images))
-    except:
-        print("Compressed data too large,OOE error! Exiting program...")
-        exit()
+    except Exception as e:
+        print('Encountered exception while loading images: ',e) 
+
 
     print("create inception graph..", end=" ", flush=True)
     fid.create_inception_graph(inception_path)  # load the graph into the current TF graph
@@ -117,5 +124,5 @@ def calc_stats():
     print("finished")
 
 #run program 
-compress_image(set='df_test.csv')
-calc_stats()
+compress_image(set='df_test.csv',size=5000)
+# calc_stats()
